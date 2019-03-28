@@ -5,11 +5,16 @@ from requests_toolbelt import MultipartEncoder
 from requests.exceptions import HTTPError
 from hyper import HTTP20Connection
 
+
 from alexa_client.alexa_client import helpers
 
 
 class ConnectionManager:
-    host = 'avs-alexa-eu.amazon.com'
+    # Base URL
+    # Asia Australia, Japan, New Zealand https://avs-alexa-fe.amazon.com
+    # Europe Austria, France, Germany, India, Italy, Spain, United Kingdom https://avs-alexa-eu.amazon.com
+    # North America Canada, Mexico, United States https://avs-alexa-na.amazon.com
+    host = 'avs-alexa-na.amazon.com'
     connection = None
 
     def create_connection(self):
@@ -23,6 +28,51 @@ class ConnectionManager:
             '/v20160207/directives',
             headers=authentication_headers
         )
+
+    def settings_update(self, device_state, authentication_headers, locale):
+        payload = {
+            'context': device_state,
+            'event': {
+                'header': {
+                    'namespace': 'Settings',
+                    'name': 'SettingsUpdated',
+                    'messageId': ''
+                },
+                'payload': {
+                    "settings": [
+                        {
+                            "key": "locale",
+                            "value": locale
+                        }
+                    ]
+                }
+            }
+        }
+        multipart_data = MultipartEncoder(
+            fields=[
+                (
+                    'metadata', (
+                        'metadata',
+                        json.dumps(payload),
+                        'application/json',
+                        {'Content-Disposition': "form-data; name='metadata'"}
+                    )
+                ),
+            ],
+            boundary='boundary'
+        )
+        headers = {
+            **authentication_headers,
+            'Content-Type': multipart_data.content_type
+        }
+        stream_id = self.connection.request(
+            'GET',
+            '/v20160207/events',
+            body=multipart_data,
+            headers=headers,
+        )
+        response = self.connection.get_response(stream_id)
+        assert response.status in [http.client.NO_CONTENT, http.client.OK, http.client.BAD_REQUEST]
 
     def synchronise_device_state(self, device_state, authentication_headers):
         """

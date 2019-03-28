@@ -96,6 +96,22 @@ class ExpectSpeechDirective(Directive):
         return self.directive['header']['dialogRequestId']
 
 
+class RenderTemplateDirective(Directive):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def maintitle(self):
+        return self.directive['payload']['title']['mainTitle']
+
+    @classmethod
+    def from_multipart(cls, part):
+        content = cls.parse_multipart(part)
+        return cls(
+            content=content
+        )
+
+
 class AVSMultipartDecoder:
 
     def __init__(self, response):
@@ -128,6 +144,8 @@ class AVSMultipartDecoder:
                     yield PlayDirective.from_multipart(part)
                 elif name == 'ExpectSpeech':
                     yield ExpectSpeechDirective.from_multipart(part)
+                elif name == 'RenderTemplate':
+                    yield RenderTemplateDirective.from_multipart(part)
                 else:
                     yield Directive.from_multipart(part)
 

@@ -17,21 +17,24 @@ class AlexaClient:
     authentication_manager = None
     connection_manager = None
     device_manager = None
+    locale = None
 
-    def __init__(self, client_id, secret, refresh_token):
+    def __init__(self, client_id, secret, refresh_token, locale='en-US'):
         self.authentication_manager = self.authentication_manager_class(
             client_id=client_id, secret=secret, refresh_token=refresh_token,
         )
         self.device_manager = self.device_manager_class()
         self.connection_manager = self.connection_manager_class()
         self.ping_manager = self.ping_manager_class(60*4, self.ping)
+        self.locale = locale
 
     def connect(self):
         self.authentication_manager.prefetch_api_token()
         self.connection_manager.create_connection()
         self.establish_downchannel_stream()
+        self.settings_update()
         self.synchronise_device_state()
-        self.ping_manager.start()
+        #self.ping_manager.start()
 
     def conditional_ping(self):
         warnings.warn('Deprecated. Removing in v2.0.0.', DeprecationWarning)
@@ -41,12 +44,21 @@ class AlexaClient:
             authentication_headers=self.authentication_manager.get_headers(),
         )
 
+    def settings_update(self):
+        with self.ping_manager.update_ping_deadline():
+            headers = self.authentication_manager.get_headers()
+            return self.connection_manager.settings_update(
+                device_state=self.device_manager.get_device_state(),
+                authentication_headers=headers,
+                locale=self.locale,
+            )
+
     def synchronise_device_state(self):
         with self.ping_manager.update_ping_deadline():
             headers = self.authentication_manager.get_headers()
             return self.connection_manager.synchronise_device_state(
-                authentication_headers=headers,
                 device_state=self.device_manager.get_device_state(),
+                authentication_headers=headers,
             )
 
     def send_audio_file(
